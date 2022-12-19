@@ -1,10 +1,3 @@
-*.iml
-.gradle
-.idea
-.DS_Store
-.externalNativeBuild
 /build
-/captures
-/local.properties
-/playground
-/releases
+/release
+/debug
