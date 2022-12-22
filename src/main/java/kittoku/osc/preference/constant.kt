@@ -5,7 +5,7 @@ import kittoku.osc.DEFAULT_MRU
 import kittoku.osc.DEFAULT_MTU
 
 
-internal enum class OscPrefKey {
+enum class OscPrefKey {
     ROOT_STATE,
     HOME_HOSTNAME,
     HOME_USERNAME,
