@@ -33,7 +33,7 @@ internal const val NOTIFICATION_ERROR_ID = 1
 internal const val NOTIFICATION_RECONNECT_ID = 2
 internal const val NOTIFICATION_DISCONNECT_ID = 3
 
-internal class SstpVpnService : VpnService() {
+class SstpVpnService : VpnService() {
     private lateinit var prefs: SharedPreferences
     private lateinit var listener: SharedPreferences.OnSharedPreferenceChangeListener
     private lateinit var notificationManager: NotificationManagerCompat
