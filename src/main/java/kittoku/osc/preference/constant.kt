@@ -7,6 +7,7 @@ import kittoku.osc.DEFAULT_MTU
 
 enum class OscPrefKey {
     ROOT_STATE,
+    HOME_CONNECTED_IP,
     HOME_HOSTNAME,
     HOME_COUNTRY,
     HOME_USERNAME,
@@ -100,6 +101,7 @@ internal val DEFAULT_STRING_MAP = mapOf(
     OscPrefKey.ROUTE_CUSTOM_ROUTES to EMPTY_TEXT,
     OscPrefKey.SSL_VERSION to "DEFAULT",
     OscPrefKey.HOME_COUNTRY to "XX",
+    OscPrefKey.HOME_CONNECTED_IP to EMPTY_TEXT
 )
 
 private val EMPTY_SET = setOf<String>()

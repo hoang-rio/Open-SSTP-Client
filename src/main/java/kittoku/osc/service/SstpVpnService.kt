@@ -68,6 +68,12 @@ class SstpVpnService : VpnService() {
                 setBooleanPrefValue(newState, OscPrefKey.HOME_CONNECTOR, prefs)
                 requestTileListening()
             }
+            if (key == OscPrefKey.HOME_CONNECTED_IP.name) {
+                val connectedIp = getStringPrefValue(OscPrefKey.HOME_CONNECTED_IP, prefs)
+                if (connectedIp != "") {
+                    beForegrounded(connectedIp)
+                }
+            }
         }
 
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -168,7 +174,7 @@ class SstpVpnService : VpnService() {
         }
     }
 
-    private fun beForegrounded() {
+    private fun beForegrounded(connectedIp: String = "") {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel(
                 NOTIFICATION_CHANNEL_NAME,
@@ -189,11 +195,22 @@ class SstpVpnService : VpnService() {
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_NAME).also {
             it.priority = NotificationCompat.PRIORITY_DEFAULT
             it.setAutoCancel(true)
-            var title = getString(R.string.notification_title, getStringPrefValue(OscPrefKey.HOME_COUNTRY, prefs), getStringPrefValue(OscPrefKey.HOME_HOSTNAME, prefs))
-            val sslPort = getIntPrefValue(OscPrefKey.SSL_PORT, prefs)
-            if (sslPort != 443) {
-                title += ":$sslPort"
+            var title: String
+            if (connectedIp != "") {
+                title = getString(
+                    R.string.connected_notification_title,
+                    getStringPrefValue(OscPrefKey.HOME_COUNTRY, prefs),
+                    getStringPrefValue(OscPrefKey.HOME_HOSTNAME, prefs)
+                )
+                val sslPort = getIntPrefValue(OscPrefKey.SSL_PORT, prefs)
+                if (sslPort != 443) {
+                    title += ":$sslPort"
+                }
+                it.setContentText(getString(R.string.connected_notification_content, connectedIp))
+            } else {
+                title = getString(R.string.connecting_notification_title)
             }
+
             it.setContentTitle(title);
             it.setSmallIcon(R.drawable.ic_notification)
             it.addAction(R.drawable.ic_baseline_close_24, getString(R.string.disconnect), pendingIntent)

@@ -52,7 +52,11 @@ internal class NetworkObserver(val bridge: ClientBridge) {
 
         summary.add("[Assigned IP Address]")
         properties.linkAddresses.forEach {
-            summary.add(it.address.hostAddress ?: "")
+            val connectedIp = it.address.hostAddress ?: ""
+            summary.add(connectedIp)
+            if (connectedIp != "") {
+                setStringPrefValue(connectedIp, OscPrefKey.HOME_CONNECTED_IP, bridge.prefs)
+            }
         }
         summary.add("")
 

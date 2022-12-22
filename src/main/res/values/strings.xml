@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name" translatable="false">Open SSTP Client</string>
-    <string name="notification_title">[MS-SSTP] Connected: [%1$s]%2$s</string>
+    <string name="connecting_notification_title">[MS-SSTP] Connecting…</string>
+    <string name="connected_notification_title">[MS-SSTP] Connected: [%1$s]%2$s</string>
+    <string name="connected_notification_content">Assigned IP: %1$s</string>
     <string name="disconnect">DISCONNECT</string>
 </resources>

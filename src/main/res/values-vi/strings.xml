@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="notification_title">[MS-SSTP] Đã kết nối: [%1$s]%2$s</string>
+    <string name="connecting_notification_title">[MS-SSTP] Đang kết nối…</string>
+    <string name="connected_notification_title">[MS-SSTP] Đã kết nối: [%1$s]%2$s</string>
+    <string name="connected_notification_content">IP đã gán: %1$s</string>
     <string name="disconnect">Ngắt kết nối</string>
 </resources>
