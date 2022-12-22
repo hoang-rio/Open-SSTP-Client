@@ -189,7 +189,7 @@ class SstpVpnService : VpnService() {
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_NAME).also {
             it.priority = NotificationCompat.PRIORITY_DEFAULT
             it.setAutoCancel(true)
-            it.setSmallIcon(R.drawable.ic_baseline_vpn_lock_24)
+            it.setSmallIcon(R.drawable.ic_notification)
             it.addAction(R.drawable.ic_baseline_close_24, "DISCONNECT", pendingIntent)
         }
 
@@ -198,7 +198,7 @@ class SstpVpnService : VpnService() {
 
     internal fun makeNotification(id: Int, message: String) {
         NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_NAME).also {
-            it.setSmallIcon(R.drawable.ic_baseline_vpn_lock_24)
+            it.setSmallIcon(R.drawable.ic_notification)
             it.setContentText(message)
             it.priority = NotificationCompat.PRIORITY_DEFAULT
             it.setAutoCancel(true)
