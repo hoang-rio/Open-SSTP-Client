@@ -108,6 +108,8 @@ class SstpVpnService : VpnService() {
                 controlClient?.disconnect()
                 controlClient = null
 
+                setStringPrefValue("", OscPrefKey.HOME_CONNECTED_IP, prefs)
+
                 close()
 
                 Service.START_NOT_STICKY
