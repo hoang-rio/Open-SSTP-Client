@@ -87,6 +87,7 @@ class SstpVpnService : VpnService() {
                 controlClient?.kill(false, null)
 
                 beForegrounded()
+                cancelNotification(NOTIFICATION_ERROR_ID)
                 resetReconnectionLife(prefs)
                 if (getBooleanPrefValue(OscPrefKey.LOG_DO_SAVE_LOG, prefs)) {
                     prepareLogWriter()
