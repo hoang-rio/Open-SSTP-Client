@@ -182,7 +182,7 @@ class SstpVpnService : VpnService() {
             NotificationChannel(
                 NOTIFICATION_CHANNEL_NAME,
                 NOTIFICATION_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_NONE
             ).also {
                 notificationManager.createNotificationChannel(it)
             }
