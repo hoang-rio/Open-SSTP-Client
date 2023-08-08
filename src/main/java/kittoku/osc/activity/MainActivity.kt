@@ -13,7 +13,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
-import androidx.preference.*
+import androidx.preference.EditTextPreference
+import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.PreferenceGroup
+import androidx.preference.PreferenceManager
+import androidx.preference.forEach
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.google.android.material.tabs.TabLayoutMediator
 import kittoku.osc.R
@@ -27,6 +31,7 @@ import kittoku.osc.preference.PROFILE_KEY_HEADER
 import kittoku.osc.preference.accessor.getStringPrefValue
 import kittoku.osc.preference.custom.OscPreference
 import kittoku.osc.preference.exportProfile
+import kittoku.osc.preference.importProfile
 
 
 class MainActivity : AppCompatActivity() {
@@ -42,6 +47,10 @@ class MainActivity : AppCompatActivity() {
             return@registerForActivityResult
         }
 
+        updatePreferenceView()
+    }
+
+    private fun updatePreferenceView() {
         listOf(homeFragment, settingFragment).forEach { fragment ->
             if (fragment.isAdded) {
                 val preferenceGroups = mutableListOf<PreferenceGroup>(fragment.preferenceScreen)
@@ -111,6 +120,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             R.id.save_profile -> showSaveDialog()
+
+            R.id.reload_defaults -> showReloadDialog()
         }
 
         return true
@@ -147,6 +158,24 @@ class MainActivity : AppCompatActivity() {
             }
 
             it.setNegativeButton("CANCEL") { _, _ -> }
+
+            it.show()
+        }
+    }
+
+    private fun showReloadDialog() {
+        AlertDialog.Builder(this).also {
+            it.setMessage("Are you sure to reload the default settings?")
+
+            it.setPositiveButton("YES") { _, _ ->
+                importProfile(null, prefs)
+
+                updatePreferenceView()
+
+                Toast.makeText(this, "DEFAULTS RELOADED", Toast.LENGTH_SHORT).show()
+            }
+
+            it.setNegativeButton("NO") { _, _ -> }
 
             it.show()
         }
