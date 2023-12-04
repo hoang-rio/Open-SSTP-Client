@@ -222,8 +222,8 @@ class SstpVpnService : VpnService() {
             it.setSmallIcon(R.drawable.ic_notification)
             it.addAction(R.drawable.ic_baseline_close_24, getString(R.string.disconnect), pendingIntent)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_DISCONNECT_ID, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_DISCONNECT_ID, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(NOTIFICATION_DISCONNECT_ID, builder.build())
         }
