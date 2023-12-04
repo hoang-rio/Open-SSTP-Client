@@ -9,6 +9,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
 import android.service.quicksettings.TileService
@@ -221,8 +222,11 @@ class SstpVpnService : VpnService() {
             it.setSmallIcon(R.drawable.ic_notification)
             it.addAction(R.drawable.ic_baseline_close_24, getString(R.string.disconnect), pendingIntent)
         }
-
-        startForeground(NOTIFICATION_DISCONNECT_ID, builder.build())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_DISCONNECT_ID, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+        } else {
+            startForeground(NOTIFICATION_DISCONNECT_ID, builder.build())
+        }
     }
 
     internal fun makeNotification(id: Int, message: String) {
