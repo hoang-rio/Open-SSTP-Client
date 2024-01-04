@@ -1,11 +1,10 @@
 package kittoku.osc.terminal
 
 import android.os.ParcelFileDescriptor
-import kittoku.osc.client.ClientBridge
-import kittoku.osc.client.ControlMessage
-import kittoku.osc.client.Result
-import kittoku.osc.client.Where
-import kittoku.osc.extension.isSame
+import kittoku.osc.ControlMessage
+import kittoku.osc.Result
+import kittoku.osc.SharedBridge
+import kittoku.osc.Where
 import kittoku.osc.extension.toHexByteArray
 import kittoku.osc.preference.OscPrefKey
 import kittoku.osc.preference.accessor.getBooleanPrefValue
@@ -16,7 +15,7 @@ import java.net.InetAddress
 import java.nio.ByteBuffer
 
 
-internal class IPTerminal(private val bridge: ClientBridge) {
+internal class IPTerminal(private val bridge: SharedBridge) {
     private var fd: ParcelFileDescriptor? = null
 
     private var inputStream: FileInputStream? = null
@@ -30,7 +29,7 @@ internal class IPTerminal(private val bridge: ClientBridge) {
 
     internal suspend fun initialize() {
         if (bridge.PPP_IPv4_ENABLED) {
-            if (bridge.currentIPv4.isSame(ByteArray(4))) {
+            if (bridge.currentIPv4.contentEquals(ByteArray(4))) {
                 bridge.controlMailbox.send(ControlMessage(Where.IPv4, Result.ERR_INVALID_ADDRESS))
                 return
             }
@@ -43,7 +42,7 @@ internal class IPTerminal(private val bridge: ClientBridge) {
                 bridge.builder.addDnsServer(getStringPrefValue(OscPrefKey.DNS_CUSTOM_ADDRESS, bridge.prefs))
             }
 
-            if (!bridge.currentProposedDNS.isSame(ByteArray(4))) {
+            if (!bridge.currentProposedDNS.contentEquals(ByteArray(4))) {
                 InetAddress.getByAddress(bridge.currentProposedDNS).also {
                     bridge.builder.addDnsServer(it)
                 }
@@ -53,7 +52,7 @@ internal class IPTerminal(private val bridge: ClientBridge) {
         }
 
         if (bridge.PPP_IPv6_ENABLED) {
-            if (bridge.currentIPv6.isSame(ByteArray(8))) {
+            if (bridge.currentIPv6.contentEquals(ByteArray(8))) {
                 bridge.controlMailbox.send(ControlMessage(Where.IPv6, Result.ERR_INVALID_ADDRESS))
                 return
             }

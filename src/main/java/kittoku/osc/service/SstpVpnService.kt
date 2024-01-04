@@ -19,14 +19,31 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.documentfile.provider.DocumentFile
 import androidx.preference.PreferenceManager
 import kittoku.osc.R
-import kittoku.osc.client.ClientBridge
-import kittoku.osc.client.control.ControlClient
-import kittoku.osc.client.control.LogWriter
+import kittoku.osc.SharedBridge
+import kittoku.osc.control.Controller
+import kittoku.osc.control.LogWriter
 import kittoku.osc.preference.OscPrefKey
-import kittoku.osc.preference.accessor.*
-import kotlinx.coroutines.*
+import kittoku.osc.preference.accessor.getBooleanPrefValue
+import kittoku.osc.preference.accessor.getIntPrefValue
+import kittoku.osc.preference.accessor.getStringPrefValue
+import kittoku.osc.preference.accessor.getURIPrefValue
+import kittoku.osc.preference.accessor.resetReconnectionLife
+import kittoku.osc.preference.accessor.setBooleanPrefValue
+import kittoku.osc.preference.accessor.setIntPrefValue
+import kittoku.osc.preference.accessor.setStringPrefValue
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 
 internal const val ACTION_VPN_CONNECT = "kittoku.osc.connect"
@@ -44,7 +61,7 @@ class SstpVpnService : VpnService() {
     internal lateinit var scope: CoroutineScope
 
     internal var logWriter: LogWriter? = null
-    private var controlClient: ControlClient?  = null
+    private var controller: Controller?  = null
 
     private var jobReconnect: Job? = null
 
@@ -88,7 +105,7 @@ class SstpVpnService : VpnService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return when (intent?.action) {
             ACTION_VPN_CONNECT -> {
-                controlClient?.kill(false, null)
+                controller?.kill(false, null)
 
                 beForegrounded()
                 cancelNotification(NOTIFICATION_ERROR_ID)
@@ -110,8 +127,8 @@ class SstpVpnService : VpnService() {
                 // ensure that reconnection has been completely canceled or done
                 runBlocking { jobReconnect?.cancelAndJoin() }
 
-                controlClient?.disconnect()
-                controlClient = null
+                controller?.disconnect()
+                controller = null
 
                 setStringPrefValue("", OscPrefKey.HOME_CONNECTED_IP, prefs)
 
@@ -123,7 +140,7 @@ class SstpVpnService : VpnService() {
     }
 
     private fun initializeClient() {
-        controlClient = ControlClient(ClientBridge(this)).also {
+        controller = Controller(SharedBridge(this)).also {
             it.launchJobMain()
         }
     }
@@ -260,8 +277,8 @@ class SstpVpnService : VpnService() {
         logWriter?.close()
         logWriter = null
 
-        controlClient?.kill(false, null)
-        controlClient = null
+        controller?.kill(false, null)
+        controller = null
 
         scope.cancel()
 
