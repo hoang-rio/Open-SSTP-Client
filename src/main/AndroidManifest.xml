@@ -27,7 +27,6 @@
 
         <service
             android:exported="true"
-            android:foregroundServiceType="specialUse"
             android:name=".service.SstpVpnService"
             android:foregroundServiceType="specialUse"
             android:permission="android.permission.BIND_VPN_SERVICE">
