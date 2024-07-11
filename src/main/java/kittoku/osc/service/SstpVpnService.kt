@@ -235,7 +235,7 @@ class SstpVpnService : VpnService() {
                 title = getString(R.string.connecting_notification_title)
             }
 
-            it.setContentTitle(title);
+            it.setContentTitle(title)
             it.setSmallIcon(R.drawable.ic_notification)
             it.addAction(R.drawable.ic_baseline_close_24, getString(R.string.disconnect), pendingIntent)
         }
@@ -263,12 +263,17 @@ class SstpVpnService : VpnService() {
         }
     }
 
-    internal fun cancelNotification(id: Int) {
+    private fun cancelNotification(id: Int) {
         notificationManager.cancel(id)
     }
 
     internal fun close() {
-        stopForeground(true)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         stopSelf()
     }
 
