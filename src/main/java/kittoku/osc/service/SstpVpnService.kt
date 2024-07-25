@@ -49,10 +49,14 @@ import java.util.Locale
 internal const val ACTION_VPN_CONNECT = "kittoku.osc.connect"
 internal const val ACTION_VPN_DISCONNECT = "kittoku.osc.disconnect"
 
-internal const val NOTIFICATION_CHANNEL_NAME = "kittoku.osc.notification.channel"
+internal const val NOTIFICATION_ERROR_CHANNEL = "ERROR"
+internal const val NOTIFICATION_RECONNECT_CHANNEL = "RECONNECT"
+internal const val NOTIFICATION_DISCONNECT_CHANNEL = "DISCONNECT"
+
 internal const val NOTIFICATION_ERROR_ID = 1
 internal const val NOTIFICATION_RECONNECT_ID = 2
 internal const val NOTIFICATION_DISCONNECT_ID = 3
+
 
 class SstpVpnService : VpnService() {
     private lateinit var prefs: SharedPreferences
@@ -151,25 +155,25 @@ class SstpVpnService : VpnService() {
 
         val prefURI = getURIPrefValue(OscPrefKey.LOG_DIR, prefs)
         if (prefURI == null) {
-            makeNotification(NOTIFICATION_ERROR_ID, "LOG: ERR_NULL_PREFERENCE")
+            notifyError("LOG: ERR_NULL_PREFERENCE")
             return
         }
 
         val dirURI = DocumentFile.fromTreeUri(this, prefURI)
         if (dirURI == null) {
-            makeNotification(NOTIFICATION_ERROR_ID, "LOG: ERR_NULL_DIRECTORY")
+            notifyError("LOG: ERR_NULL_DIRECTORY")
             return
         }
 
         val fileURI = dirURI.createFile("text/plain", filename)
         if (fileURI == null) {
-            makeNotification(NOTIFICATION_ERROR_ID, "LOG: ERR_NULL_FILE")
+            notifyError("LOG: ERR_NULL_FILE")
             return
         }
 
         val stream = contentResolver.openOutputStream(fileURI.uri, "wa")
         if (stream == null) {
-            makeNotification(NOTIFICATION_ERROR_ID, "LOG: ERR_NULL_STREAM")
+            notifyError("LOG: ERR_NULL_STREAM")
             return
         }
 
@@ -183,8 +187,8 @@ class SstpVpnService : VpnService() {
                     val life = it - 1
                     setIntPrefValue(life, OscPrefKey.RECONNECTION_LIFE, prefs)
 
-                    val message = "Reconnection will be tried (LIFE = $life)"
-                    makeNotification(NOTIFICATION_RECONNECT_ID, message)
+                    val message = getString(R.string.reconnecting, life)
+                    makeNotification(message, NOTIFICATION_RECONNECT_ID, NOTIFICATION_RECONNECT_CHANNEL)
                     logWriter?.report(message)
                 }
 
@@ -200,12 +204,14 @@ class SstpVpnService : VpnService() {
 
     private fun beForegrounded(connectedIp: String = "") {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel(
-                NOTIFICATION_CHANNEL_NAME,
-                NOTIFICATION_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_NONE
-            ).also {
-                notificationManager.createNotificationChannel(it)
+            arrayOf(
+                NOTIFICATION_ERROR_CHANNEL,
+                NOTIFICATION_RECONNECT_CHANNEL,
+                NOTIFICATION_DISCONNECT_CHANNEL,
+            ).map {
+                NotificationChannel(it, it, NotificationManager.IMPORTANCE_NONE)
+            }.also {
+                notificationManager.createNotificationChannels(it)
             }
         }
 
@@ -216,7 +222,7 @@ class SstpVpnService : VpnService() {
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_NAME).also {
+        val builder = NotificationCompat.Builder(this, NOTIFICATION_DISCONNECT_CHANNEL).also {
             it.priority = NotificationCompat.PRIORITY_DEFAULT
             it.setAutoCancel(true)
             var title: String
@@ -246,8 +252,8 @@ class SstpVpnService : VpnService() {
         }
     }
 
-    internal fun makeNotification(id: Int, message: String) {
-        NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_NAME).also {
+    private fun makeNotification(message: String, id: Int, channel: String) {
+        NotificationCompat.Builder(this, channel).also {
             it.setSmallIcon(R.drawable.ic_notification)
             it.setContentText(message)
             it.priority = NotificationCompat.PRIORITY_DEFAULT
@@ -261,6 +267,10 @@ class SstpVpnService : VpnService() {
                 notificationManager.notify(id, it.build())
             }
         }
+    }
+
+    internal fun notifyError(message: String) {
+        makeNotification(message, NOTIFICATION_ERROR_ID, NOTIFICATION_ERROR_CHANNEL)
     }
 
     private fun cancelNotification(id: Int) {

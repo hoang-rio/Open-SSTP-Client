@@ -4,4 +4,5 @@
     <string name="connected_notification_title">[MS-SSTP] Đã kết nối: [%1$s]%2$s</string>
     <string name="connected_notification_content">IP đã gán: %1$s</string>
     <string name="disconnect">Ngắt kết nối</string>
+    <string name="reconnecting">Sẽ thử kết nôi lại sau %1$d</string>
 </resources>
