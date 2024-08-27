@@ -170,7 +170,6 @@ internal class SSLTerminal(private val bridge: SharedBridge) {
             val cause = e.cause
             if (cause is CertPathValidatorException) {
                 bridge.service.logWriter?.logCertPathValidatorException(cause)
-
                 bridge.controlMailbox.send(ControlMessage(Where.CERT_PATH, Result.ERR_VERIFICATION_FAILED))
 
                 return false
