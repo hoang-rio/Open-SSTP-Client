@@ -57,7 +57,7 @@ class MainActivity : AppCompatActivity() {
                 val preferenceGroups = mutableListOf<PreferenceGroup>(fragment.preferenceScreen)
 
                 while (preferenceGroups.isNotEmpty()) {
-                    preferenceGroups.removeFirst().forEach {
+                    preferenceGroups.removeAt(0).forEach {
                         if (it is OscPreference) {
                             it.updateView()
                         }
