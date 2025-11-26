@@ -40,13 +40,13 @@ internal class SstpTileService : TileService() {
     }
 
     private fun updateTileState() {
-        qsTile.state = if (rootState) {
+        qsTile?.state = if (rootState) {
             Tile.STATE_ACTIVE
         } else {
             Tile.STATE_INACTIVE
         }
 
-        qsTile.updateTile()
+        qsTile?.updateTile()
     }
 
     private fun flipTileState() {
