@@ -129,6 +129,8 @@ internal class SharedBridge(internal val service: SstpVpnService) {
         }
     }
 
+    internal val excludedApps: Set<String> = getSetPrefValue(OscPrefKey.ROUTE_EXCLUDED_APPS, prefs)
+
     internal fun isEnabled(authProtocol: String): Boolean {
         return authProtocol in PPP_AUTH_PROTOCOLS
     }

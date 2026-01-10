@@ -75,6 +75,10 @@ internal class IPTerminal(private val bridge: SharedBridge) {
             addAppBasedRules()
         }
 
+        if (bridge.excludedApps.isNotEmpty()) {
+            addExcludedAppRules()
+        }
+
         bridge.builder.setMtu(bridge.PPP_MTU)
         bridge.builder.setBlocking(true)
 
@@ -111,6 +115,12 @@ internal class IPTerminal(private val bridge: SharedBridge) {
     private fun addAppBasedRules() {
         bridge.allowedApps.forEach {
             bridge.builder.addAllowedApplication(it.packageName)
+        }
+    }
+
+    private fun addExcludedAppRules() {
+        bridge.excludedApps.forEach {
+            bridge.builder.addDisallowedApplication(it)
         }
     }
 
