@@ -40,12 +40,24 @@ internal class IPTerminal(private val bridge: SharedBridge) {
 
             if (isCustomDNSServerUsed) {
                 bridge.builder.addDnsServer(getStringPrefValue(OscPrefKey.DNS_CUSTOM_ADDRESS, bridge.prefs))
+
+                // Add secondary custom DNS if available
+                val secondaryDns = getStringPrefValue(OscPrefKey.DNS_CUSTOM_ADDRESS_SECONDARY, bridge.prefs)
+                if (secondaryDns.isNotEmpty()) {
+                    bridge.builder.addDnsServer(secondaryDns)
+                }
             }
 
             if (!bridge.currentProposedDNS.contentEquals(ByteArray(4))) {
                 InetAddress.getByAddress(bridge.currentProposedDNS).also {
                     bridge.builder.addDnsServer(it)
                 }
+            }
+
+            // Fallback: if no DNS was configured at all, use public DNS to avoid DNS leaks
+            if (!isCustomDNSServerUsed && bridge.currentProposedDNS.contentEquals(ByteArray(4))) {
+                bridge.builder.addDnsServer("8.8.8.8")
+                bridge.builder.addDnsServer("8.8.4.4")
             }
 
             setIPv4BasedRouting()
