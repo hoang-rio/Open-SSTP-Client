@@ -229,23 +229,14 @@ class SstpVpnService : VpnService() {
         val builder = NotificationCompat.Builder(this, NOTIFICATION_DISCONNECT_CHANNEL).also {
             it.priority = NotificationCompat.PRIORITY_DEFAULT
             it.setAutoCancel(true)
-            var title: String
+            val serverName = getStringPrefValue(OscPrefKey.HOME_SERVER_NAME, prefs)
+                .ifEmpty { getStringPrefValue(OscPrefKey.HOME_HOSTNAME, prefs) }
+            it.setContentTitle(getString(R.string.notification_title, serverName))
             if (connectedIp != "") {
-                title = getString(
-                    R.string.connected_notification_title,
-                    getStringPrefValue(OscPrefKey.HOME_COUNTRY, prefs),
-                    getStringPrefValue(OscPrefKey.HOME_HOSTNAME, prefs)
-                )
-                val sslPort = getIntPrefValue(OscPrefKey.SSL_PORT, prefs)
-                if (sslPort != 443) {
-                    title += ":$sslPort"
-                }
                 it.setContentText(getString(R.string.connected_notification_content, connectedIp))
             } else {
-                title = getString(R.string.connecting_notification_title)
+                it.setContentText(getString(R.string.connecting_notification_content))
             }
-
-            it.setContentTitle(title)
             it.setSmallIcon(R.drawable.ic_notification)
             it.addAction(R.drawable.ic_baseline_close_24, getString(R.string.disconnect), pendingIntent)
         }

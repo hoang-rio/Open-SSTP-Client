@@ -10,6 +10,7 @@ enum class OscPrefKey {
     HOME_CONNECTED_IP,
     HOME_HOSTNAME,
     HOME_COUNTRY,
+    HOME_SERVER_NAME,
     HOME_USERNAME,
     HOME_PASSWORD,
     HOME_CONNECTOR,
@@ -91,6 +92,7 @@ private const val EMPTY_TEXT = ""
 
 internal val DEFAULT_STRING_MAP = mapOf(
     OscPrefKey.HOME_HOSTNAME to EMPTY_TEXT,
+    OscPrefKey.HOME_SERVER_NAME to EMPTY_TEXT,
     OscPrefKey.HOME_USERNAME to EMPTY_TEXT,
     OscPrefKey.HOME_PASSWORD to EMPTY_TEXT,
     OscPrefKey.HOME_STATUS to EMPTY_TEXT,
