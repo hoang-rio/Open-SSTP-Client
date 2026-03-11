@@ -5,8 +5,8 @@
     <string name="connected_notification_content">Assigned IP: %1$s</string>
     <string name="disconnect">Disconnect</string>
     <string name="reconnecting">Reconnection will be tried (LIFE = %1$d)</string>
-    <string name="channel_name_critical">SSTP VPN Critical</string>
-    <string name="channel_description_critical">Critical notifications for SSTP VPN</string>
+    <string name="sstp_channel_name_critical">SSTP VPN Critical</string>
+    <string name="sstp_channel_description_critical">Critical notifications for SSTP VPN</string>
     <string name="notification_title_disconnected">SSTP VPN Disconnected</string>
-    <string name="notification_disconnected_error">SSTP VPN disconnected due to error</string>
+    <string name="sstp_notification_disconnected_error">SSTP VPN disconnected due to error</string>
 </resources>

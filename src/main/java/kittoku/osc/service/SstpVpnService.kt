@@ -90,10 +90,10 @@ class SstpVpnService : VpnService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                getString(R.string.channel_name_critical),
+                getString(R.string.sstp_channel_name_critical),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = getString(R.string.channel_description_critical)
+                description = getString(R.string.sstp_channel_description_critical)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 250, 250, 250)
                 
@@ -110,7 +110,7 @@ class SstpVpnService : VpnService() {
         val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.notification_title_disconnected))
-            .setContentText(getString(R.string.notification_disconnected_error))
+            .setContentText(getString(R.string.sstp_notification_disconnected_error))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setDefaults(Notification.DEFAULT_ALL)
             .setAutoCancel(true)
