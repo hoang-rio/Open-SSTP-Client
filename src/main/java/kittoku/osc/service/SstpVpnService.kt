@@ -107,13 +107,43 @@ class SstpVpnService : VpnService() {
             notificationManager.createNotificationChannel(channel)
         }
 
+        var contentPendingIntent: PendingIntent? = null
+        if (notificationTargetActivity != null) {
+            val intent = Intent(this, notificationTargetActivity!!)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+
+            try {
+                val startKeyField = notificationTargetActivity!!.getField("TYPE_START")
+                val startValueField = notificationTargetActivity!!.getField("TYPE_FROM_NOTIFY")
+
+                val startKey = startKeyField.get(null).toString()
+                val startValue = startValueField.get(null).toString().toInt()
+
+                intent.putExtra(startKey, startValue)
+            } catch (e: Exception) {
+                Log.e("SstpVpnService", "Failed to set notification intent extras via reflection", e)
+            }
+
+            contentPendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
         val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.notification_title_disconnected))
             .setContentText(getString(R.string.sstp_notification_disconnected_error))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setDefaults(Notification.DEFAULT_ALL)
+            .setVibrate(longArrayOf(0, 250, 250, 250))
             .setAutoCancel(true)
+        
+        if (contentPendingIntent != null) {
+            builder.setContentIntent(contentPendingIntent)
+        }
 
         tryNotify(builder.build(), NOTIFICATION_CRITICAL_ID)
     }
