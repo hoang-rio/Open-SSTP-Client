@@ -1,5 +1,7 @@
 package kittoku.osc.service
 
+import android.content.Context
+import android.media.AudioAttributes
 import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
@@ -13,6 +15,11 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.media.RingtoneManager
+import android.media.Ringtone
+import android.net.Uri
 import android.util.Log
 import android.service.quicksettings.TileService
 import androidx.core.app.ActivityCompat
@@ -52,11 +59,13 @@ internal const val ACTION_VPN_CONNECT = "kittoku.osc.connect"
 internal const val ACTION_VPN_DISCONNECT = "kittoku.osc.disconnect"
 
 internal const val NOTIFICATION_ERROR_CHANNEL = "ERROR"
+internal const val NOTIFICATION_CRITICAL_CHANNEL = "CRITICAL"
 internal const val NOTIFICATION_RECONNECT_CHANNEL = "RECONNECT"
 internal const val NOTIFICATION_DISCONNECT_CHANNEL = "DISCONNECT"
 internal const val NOTIFICATION_CERTIFICATE_CHANNEL = "CERTIFICATE"
 
 internal const val NOTIFICATION_ERROR_ID = 1
+internal const val NOTIFICATION_CRITICAL_ID = 5
 internal const val NOTIFICATION_RECONNECT_ID = 2
 internal const val NOTIFICATION_DISCONNECT_ID = 3
 internal const val NOTIFICATION_CERTIFICATE_ID = 4
@@ -70,11 +79,47 @@ class SstpVpnService : VpnService() {
 
     internal var logWriter: LogWriter? = null
     private var controller: Controller?  = null
+    private var mWasConnected = false
 
     private var jobReconnect: Job? = null
 
     companion object {
         var notificationTargetActivity: Class<*>? = null
+    }
+
+    private fun triggerDisconnectNotification() {
+        val channelId = NOTIFICATION_CRITICAL_CHANNEL
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                getString(R.string.channel_name_critical),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = getString(R.string.channel_description_critical)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 250, 250)
+                
+                // Set sound
+                val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                setSound(soundUri, AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build())
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val builder = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(getString(R.string.notification_title_disconnected))
+            .setContentText(getString(R.string.notification_disconnected_error))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setDefaults(Notification.DEFAULT_ALL)
+            .setAutoCancel(true)
+
+        tryNotify(builder.build(), NOTIFICATION_CRITICAL_ID)
     }
 
     private fun setRootState(state: Boolean) {
@@ -104,6 +149,7 @@ class SstpVpnService : VpnService() {
             if (key == OscPrefKey.HOME_CONNECTED_IP.name) {
                 val connectedIp = getStringPrefValue(OscPrefKey.HOME_CONNECTED_IP, prefs)
                 if (connectedIp != "") {
+                    mWasConnected = true
                     beForegrounded(connectedIp)
                 }
             }
@@ -118,6 +164,7 @@ class SstpVpnService : VpnService() {
         return when (intent?.action) {
             ACTION_VPN_CONNECT -> {
                 controller?.kill(false, null)
+                mWasConnected = false
 
                 beForegrounded()
                 cancelNotification(NOTIFICATION_ERROR_ID)
@@ -292,6 +339,10 @@ class SstpVpnService : VpnService() {
     }
 
     internal fun notifyError(message: String) {
+        if (mWasConnected) {
+            triggerDisconnectNotification()
+            mWasConnected = false
+        }
         notifyMessage(message, NOTIFICATION_ERROR_ID, NOTIFICATION_ERROR_CHANNEL)
     }
 
