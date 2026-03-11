@@ -13,6 +13,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
+import android.util.Log
 import android.service.quicksettings.TileService
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -71,6 +72,10 @@ class SstpVpnService : VpnService() {
     private var controller: Controller?  = null
 
     private var jobReconnect: Job? = null
+
+    companion object {
+        var notificationTargetActivity: Class<*>? = null
+    }
 
     private fun setRootState(state: Boolean) {
         setBooleanPrefValue(state, OscPrefKey.ROOT_STATE, prefs)
@@ -219,12 +224,37 @@ class SstpVpnService : VpnService() {
             }
         }
 
-        val pendingIntent = PendingIntent.getService(
+        val disconnectPendingIntent = PendingIntent.getService(
             this,
             0,
             Intent(this, SstpVpnService::class.java).setAction(ACTION_VPN_DISCONNECT),
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
+
+        var contentPendingIntent: PendingIntent? = null
+        if (notificationTargetActivity != null) {
+            val intent = Intent(this, notificationTargetActivity!!)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+
+            try {
+                val startKeyField = notificationTargetActivity!!.getField("TYPE_START")
+                val startValueField = notificationTargetActivity!!.getField("TYPE_FROM_NOTIFY")
+
+                val startKey = startKeyField.get(null).toString()
+                val startValue = startValueField.get(null).toString().toInt()
+
+                intent.putExtra(startKey, startValue)
+            } catch (e: Exception) {
+                Log.e("SstpVpnService", "Failed to set notification intent extras via reflection", e)
+            }
+
+            contentPendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
 
         val builder = NotificationCompat.Builder(this, NOTIFICATION_DISCONNECT_CHANNEL).also {
             it.priority = NotificationCompat.PRIORITY_DEFAULT
@@ -237,8 +267,11 @@ class SstpVpnService : VpnService() {
             } else {
                 it.setContentText(getString(R.string.connecting_notification_content))
             }
+            if (contentPendingIntent != null) {
+                it.setContentIntent(contentPendingIntent)
+            }
             it.setSmallIcon(R.drawable.ic_notification)
-            it.addAction(R.drawable.ic_baseline_close_24, getString(R.string.disconnect), pendingIntent)
+            it.addAction(R.drawable.ic_baseline_close_24, getString(R.string.disconnect), disconnectPendingIntent)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_DISCONNECT_ID, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
