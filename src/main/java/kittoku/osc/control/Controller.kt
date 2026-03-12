@@ -1,5 +1,6 @@
 package kittoku.osc.control
 
+import android.util.Log
 import kittoku.osc.ControlMessage
 import kittoku.osc.Result
 import kittoku.osc.SharedBridge
@@ -55,6 +56,7 @@ internal class Controller(internal val bridge: SharedBridge) {
     private var jobMain: Job? = null
 
     private val mutex = Mutex()
+    private var destructionJob: Job? = null
 
     private val isReconnectionEnabled = getBooleanPrefValue(OscPrefKey.RECONNECTION_ENABLED, bridge.prefs)
     private val isReconnectionAvailable: Boolean
@@ -250,31 +252,43 @@ internal class Controller(internal val bridge: SharedBridge) {
         return false
     }
 
-    internal fun disconnect() { // use if the user want to normally disconnect
-        kill(false) {
+    internal fun disconnect(): Job? { // use if the user want to normally disconnect
+        return kill(false) {
             sstpClient?.sendLastPacket(SSTP_MESSAGE_TYPE_CALL_DISCONNECT)
         }
     }
 
-    internal fun kill(isReconnectionRequested: Boolean, cleanup: (suspend () -> Unit)?) {
-        if (!mutex.tryLock()) return
+    internal fun kill(isReconnectionRequested: Boolean, cleanup: (suspend () -> Unit)?): Job? {
+        Log.d("SSTPController", "kill() called, isReconnectionRequested=$isReconnectionRequested")
+        
+        if (!mutex.tryLock()) {
+            Log.d("SSTPController", "kill(): Failed to acquire lock, returning existing destructionJob")
+            return destructionJob
+        }
 
-        bridge.service.scope.launch {
+        destructionJob = bridge.service.scope.launch {
+            Log.d("SSTPController", "kill(): Launching cleanup job")
             observer?.close()
 
             jobMain?.cancel()
+            Log.d("SSTPController", "kill(): jobMain cancelled")
             cancelClients()
 
             cleanup?.invoke()
+            Log.d("SSTPController", "kill(): cleanup invoked")
 
             closeTerminals()
 
             if (isReconnectionRequested && isReconnectionAvailable) {
+                Log.d("SSTPController", "kill(): Triggering reconnection")
                 bridge.service.launchJobReconnect()
             } else {
+                Log.d("SSTPController", "kill(): Closing service bridge")
                 bridge.service.close()
             }
         }
+        
+        return destructionJob
     }
 
     private fun cancelClients() {
