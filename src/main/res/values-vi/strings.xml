@@ -3,6 +3,7 @@
     <string name="connecting_notification_content">Đang kết nối…</string>
     <string name="notification_title">MS-SSTP - %1$s</string>
     <string name="connected_notification_content">IP đã gán: %1$s</string>
+    <string name="sstp_statusline_bytecount">↓%2$s %1$s - ↑%4$s %3$s</string>
     <string name="disconnect">Ngắt kết nối</string>
     <string name="reconnecting">Sẽ thử kết nôi lại sau %1$d</string>
     <string name="sstp_channel_name_critical">Lỗi SSTP VPN</string>

@@ -74,6 +74,7 @@ internal class OutgoingManager(private val bridge: SharedBridge) {
     }
 
     private suspend fun load(packet: ByteBuffer): Boolean { // true if data protocol is enabled
+        val payloadSize = packet.remaining()
         val header = packet.getInt(0)
         val protocol = when (header and IP_VERSION_MASK) {
             IPv4_VERSION_HEADER -> {
@@ -100,6 +101,7 @@ internal class OutgoingManager(private val bridge: SharedBridge) {
         mainBuffer.putShort(PPP_HDLC_HEADER)
         mainBuffer.putShort(protocol)
         mainBuffer.put(packet)
+        bridge.service.recordTraffic(outDeltaBytes = payloadSize.toLong())
 
         return true
     }

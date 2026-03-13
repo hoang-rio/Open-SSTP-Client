@@ -16,6 +16,8 @@ import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.net.VpnService
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.service.quicksettings.TileService
 import android.util.Log
 import androidx.core.app.ActivityCompat
@@ -68,6 +70,10 @@ internal const val NOTIFICATION_CERTIFICATE_ID = 4
 
 
 class SstpVpnService : VpnService() {
+    interface TrafficListener {
+        fun onSstpTrafficUpdated(snapshot: SstpTrafficSnapshot)
+    }
+
     private lateinit var prefs: SharedPreferences
     private lateinit var listener: SharedPreferences.OnSharedPreferenceChangeListener
     private lateinit var notificationManager: NotificationManagerCompat
@@ -76,11 +82,51 @@ class SstpVpnService : VpnService() {
     internal var logWriter: LogWriter? = null
     private var controller: Controller?  = null
     private var mWasConnected = false
+    private var currentConnectedIp = ""
+    private var totalInBytes = 0L
+    private var totalOutBytes = 0L
+    private var lastPublishedInBytes = 0L
+    private var lastPublishedOutBytes = 0L
+    private var lastPublishedAtMs = 0L
 
     private var jobReconnect: Job? = null
 
     companion object {
+        private const val STATS_INTERVAL_MS = 1000L
+        private const val TRAFFIC_PREFS_SUFFIX = "_preferences"
+        private const val DOWNLOADED_DATA_KEY = "downloaded_data"
+        private const val UPLOADED_DATA_KEY = "uploaded_data"
+
         var notificationTargetActivity: Class<*>? = null
+        var currentTrafficSnapshot: SstpTrafficSnapshot = SstpTrafficSnapshot.EMPTY
+            private set
+        var lastTrafficSnapshot: SstpTrafficSnapshot = SstpTrafficSnapshot.EMPTY
+            private set
+        var mDisplaySpeed: Boolean = true
+
+        private val trafficListeners = mutableListOf<TrafficListener>()
+        private val mainHandler = Handler(Looper.getMainLooper())
+
+        fun addTrafficListener(listener: TrafficListener) {
+            if (!trafficListeners.contains(listener)) {
+                trafficListeners.add(listener)
+                listener.onSstpTrafficUpdated(currentTrafficSnapshot)
+            }
+        }
+
+        fun removeTrafficListener(listener: TrafficListener) {
+            trafficListeners.remove(listener)
+        }
+
+        private fun notifyTrafficListeners(snapshot: SstpTrafficSnapshot) {
+            currentTrafficSnapshot = snapshot
+            if (snapshot.inBytes > 0L || snapshot.outBytes > 0L || snapshot.diffInBytes > 0L || snapshot.diffOutBytes > 0L) {
+                lastTrafficSnapshot = snapshot
+            }
+            mainHandler.post {
+                trafficListeners.forEach { it.onSstpTrafficUpdated(snapshot) }
+            }
+        }
     }
 
     private fun triggerDisconnectNotification() {
@@ -176,7 +222,10 @@ class SstpVpnService : VpnService() {
                 val connectedIp = getStringPrefValue(OscPrefKey.HOME_CONNECTED_IP, prefs)
                 if (connectedIp != "") {
                     mWasConnected = true
+                    currentConnectedIp = connectedIp
                     beForegrounded(connectedIp)
+                } else {
+                    currentConnectedIp = ""
                 }
             }
         }
@@ -191,6 +240,8 @@ class SstpVpnService : VpnService() {
             ACTION_VPN_CONNECT -> {
                 controller?.kill(false, null)
                 mWasConnected = false
+                currentConnectedIp = ""
+                resetTrafficTracking()
 
                 beForegrounded()
                 cancelNotification(NOTIFICATION_ERROR_ID)
@@ -216,6 +267,8 @@ class SstpVpnService : VpnService() {
                 controller = null
 
                 setStringPrefValue("", OscPrefKey.HOME_CONNECTED_IP, prefs)
+                currentConnectedIp = ""
+                notifyTrafficListeners(SstpTrafficSnapshot.EMPTY)
 
                 close()
 
@@ -336,7 +389,12 @@ class SstpVpnService : VpnService() {
                 .ifEmpty { getStringPrefValue(OscPrefKey.HOME_HOSTNAME, prefs) }
             it.setContentTitle(getString(R.string.notification_title, serverName))
             if (connectedIp != "") {
-                it.setContentText(getString(R.string.connected_notification_content, connectedIp))
+                val contentText = if (mDisplaySpeed && currentTrafficSnapshot != SstpTrafficSnapshot.EMPTY) {
+                    formatTrafficSnapshot(currentTrafficSnapshot)
+                } else {
+                    getString(R.string.connected_notification_content, connectedIp)
+                }
+                it.setContentText(contentText)
             } else {
                 it.setContentText(getString(R.string.connecting_notification_content))
             }
@@ -351,6 +409,65 @@ class SstpVpnService : VpnService() {
         } else {
             startForeground(NOTIFICATION_DISCONNECT_ID, builder.build())
         }
+    }
+
+    private fun updateForegroundNotification() {
+        if (currentConnectedIp.isEmpty()) return
+        tryNotify(buildForegroundNotification(currentConnectedIp), NOTIFICATION_DISCONNECT_ID)
+    }
+
+    private fun buildForegroundNotification(connectedIp: String): Notification {
+        val disconnectPendingIntent = PendingIntent.getService(
+            this,
+            0,
+            Intent(this, SstpVpnService::class.java).setAction(ACTION_VPN_DISCONNECT),
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        var contentPendingIntent: PendingIntent? = null
+        if (notificationTargetActivity != null) {
+            val intent = Intent(this, notificationTargetActivity!!)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+
+            try {
+                val startKeyField = notificationTargetActivity!!.getField("TYPE_START")
+                val startValueField = notificationTargetActivity!!.getField("TYPE_FROM_NOTIFY")
+
+                val startKey = startKeyField.get(null).toString()
+                val startValue = startValueField.get(null).toString().toInt()
+
+                intent.putExtra(startKey, startValue)
+            } catch (e: Exception) {
+                Log.e("SstpVpnService", "Failed to set notification intent extras via reflection", e)
+            }
+
+            contentPendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
+        return NotificationCompat.Builder(this, NOTIFICATION_DISCONNECT_CHANNEL).also {
+            it.priority = NotificationCompat.PRIORITY_DEFAULT
+            it.setAutoCancel(true)
+            val serverName = getStringPrefValue(OscPrefKey.HOME_SERVER_NAME, prefs)
+                .ifEmpty { getStringPrefValue(OscPrefKey.HOME_HOSTNAME, prefs) }
+            it.setContentTitle(getString(R.string.notification_title, serverName))
+            it.setContentText(
+                if (mDisplaySpeed && currentTrafficSnapshot != SstpTrafficSnapshot.EMPTY) {
+                    formatTrafficSnapshot(currentTrafficSnapshot)
+                } else {
+                    getString(R.string.connected_notification_content, connectedIp)
+                }
+            )
+            if (contentPendingIntent != null) {
+                it.setContentIntent(contentPendingIntent)
+            }
+            it.setSmallIcon(R.drawable.ic_notification)
+            it.addAction(R.drawable.ic_baseline_close_24, getString(R.string.disconnect), disconnectPendingIntent)
+        }.build()
     }
 
     internal fun notifyMessage(message: String, id: Int, channel: String) {
@@ -408,5 +525,98 @@ class SstpVpnService : VpnService() {
 
         setRootState(false)
         prefs.unregisterOnSharedPreferenceChangeListener(listener)
+    }
+
+    @Synchronized
+    internal fun recordTraffic(inDeltaBytes: Long = 0L, outDeltaBytes: Long = 0L) {
+        if (inDeltaBytes <= 0L && outDeltaBytes <= 0L) return
+
+        val now = System.currentTimeMillis()
+        if (lastPublishedAtMs == 0L) {
+            lastPublishedAtMs = now
+        }
+
+        totalInBytes += inDeltaBytes
+        totalOutBytes += outDeltaBytes
+        accumulatePersistedTraffic(inDeltaBytes, outDeltaBytes)
+
+        if (currentTrafficSnapshot == SstpTrafficSnapshot.EMPTY || now - lastPublishedAtMs >= STATS_INTERVAL_MS) {
+            publishTrafficSnapshot(now)
+        }
+    }
+
+    @Synchronized
+    private fun resetTrafficTracking() {
+        totalInBytes = 0L
+        totalOutBytes = 0L
+        lastPublishedInBytes = 0L
+        lastPublishedOutBytes = 0L
+        lastPublishedAtMs = 0L
+        lastTrafficSnapshot = SstpTrafficSnapshot.EMPTY
+        notifyTrafficListeners(SstpTrafficSnapshot.EMPTY)
+    }
+
+    @Synchronized
+    private fun publishTrafficSnapshot(now: Long = System.currentTimeMillis()) {
+        val interval = (now - lastPublishedAtMs).coerceAtLeast(1L)
+        val snapshot = SstpTrafficSnapshot(
+            inBytes = totalInBytes,
+            outBytes = totalOutBytes,
+            diffInBytes = (totalInBytes - lastPublishedInBytes).coerceAtLeast(0L),
+            diffOutBytes = (totalOutBytes - lastPublishedOutBytes).coerceAtLeast(0L),
+            intervalMs = interval,
+            timestampMs = now
+        )
+
+        lastPublishedInBytes = totalInBytes
+        lastPublishedOutBytes = totalOutBytes
+        lastPublishedAtMs = now
+        notifyTrafficListeners(snapshot)
+
+        if (mDisplaySpeed && currentConnectedIp.isNotEmpty()) {
+            updateForegroundNotification()
+        }
+    }
+
+    private fun formatTrafficSnapshot(snapshot: SstpTrafficSnapshot): String {
+        return getString(
+            R.string.sstp_statusline_bytecount,
+            humanReadableByteCount(snapshot.inBytes, false),
+            humanReadableByteCount(snapshot.inBytesPerSecond(), true),
+            humanReadableByteCount(snapshot.outBytes, false),
+            humanReadableByteCount(snapshot.outBytesPerSecond(), true)
+        )
+    }
+
+    private fun accumulatePersistedTraffic(downloadedDelta: Long, uploadedDelta: Long) {
+        if (downloadedDelta <= 0L && uploadedDelta <= 0L) return
+        val prefs = getTrafficPrefs()
+        prefs.edit()
+            .putLong(DOWNLOADED_DATA_KEY, prefs.getLong(DOWNLOADED_DATA_KEY, 0L) + downloadedDelta)
+            .putLong(UPLOADED_DATA_KEY, prefs.getLong(UPLOADED_DATA_KEY, 0L) + uploadedDelta)
+            .apply()
+    }
+
+    private fun getTrafficPrefs(): SharedPreferences {
+        return applicationContext.getSharedPreferences(
+            applicationContext.packageName + TRAFFIC_PREFS_SUFFIX,
+            Context.MODE_PRIVATE
+        )
+    }
+
+    private fun humanReadableByteCount(bytes: Long, speed: Boolean): String {
+        val value = if (speed) bytes * 8.0 else bytes.toDouble()
+        val unit = if (speed) 1000.0 else 1024.0
+        val units = if (speed) {
+            arrayOf("bit/s", "kbit/s", "Mbit/s", "Gbit/s")
+        } else {
+            arrayOf("B", "KB", "MB", "GB")
+        }
+        if (value <= 0.0) {
+            return if (speed) "0 bit/s" else "0 B"
+        }
+        val exp = kotlin.math.min((kotlin.math.ln(value) / kotlin.math.ln(unit)).toInt(), units.lastIndex)
+        val scaled = value / Math.pow(unit, exp.toDouble())
+        return String.format(java.util.Locale.US, "%.1f %s", scaled, units[exp])
     }
 }

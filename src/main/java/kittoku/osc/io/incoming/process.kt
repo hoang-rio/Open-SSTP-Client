@@ -302,6 +302,7 @@ internal fun IncomingManager.processIPPacket(isEnabledProtocol: Boolean, packetS
         val ipPacketSize = packetSize - 8
 
         bridge.ipTerminal!!.writePacket(start, ipPacketSize, buffer)
+        bridge.service.recordTraffic(inDeltaBytes = ipPacketSize.toLong())
     }
 
     buffer.move(packetSize)
