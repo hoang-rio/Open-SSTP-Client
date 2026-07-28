@@ -48,6 +48,9 @@ enum class OscPrefKey {
     ROUTE_DO_ENABLE_APP_BASED_RULE,
     ROUTE_ALLOWED_APPS,
     ROUTE_EXCLUDED_APPS,
+    ROUTE_APP_LIST_TYPE,
+    ROUTE_DO_SHOW_BACKGROUND_APPS,
+    ROUTE_SELECTED_APPS,
     RECONNECTION_ENABLED,
     RECONNECTION_COUNT,
     RECONNECTION_INTERVAL,
@@ -74,6 +77,7 @@ internal val DEFAULT_BOOLEAN_MAP = mapOf(
     OscPrefKey.ROUTE_DO_ROUTE_PRIVATE_ADDRESSES to false,
     OscPrefKey.ROUTE_DO_ADD_CUSTOM_ROUTES to false,
     OscPrefKey.ROUTE_DO_ENABLE_APP_BASED_RULE to false,
+    OscPrefKey.ROUTE_DO_SHOW_BACKGROUND_APPS to false,
     OscPrefKey.RECONNECTION_ENABLED to false,
     OscPrefKey.LOG_DO_SAVE_LOG to false
 )
@@ -90,6 +94,8 @@ internal val DEFAULT_INT_MAP = mapOf(
 )
 
 private const val EMPTY_TEXT = ""
+internal const val LIST_TYPE_ALLOWED = "Allowed Apps"
+internal const val LIST_TYPE_DISALLOWED = "Disallowed Apps"
 
 internal val DEFAULT_STRING_MAP = mapOf(
     OscPrefKey.HOME_HOSTNAME to EMPTY_TEXT,
@@ -97,6 +103,7 @@ internal val DEFAULT_STRING_MAP = mapOf(
     OscPrefKey.HOME_USERNAME to EMPTY_TEXT,
     OscPrefKey.HOME_PASSWORD to EMPTY_TEXT,
     OscPrefKey.HOME_STATUS to EMPTY_TEXT,
+    OscPrefKey.SSL_VERSION to "DEFAULT",
     OscPrefKey.SSL_CUSTOM_SNI to EMPTY_TEXT,
     OscPrefKey.PROXY_HOSTNAME to EMPTY_TEXT,
     OscPrefKey.PROXY_USERNAME to EMPTY_TEXT,
@@ -107,20 +114,22 @@ internal val DEFAULT_STRING_MAP = mapOf(
     OscPrefKey.ROUTE_CUSTOM_ROUTES to EMPTY_TEXT,
     OscPrefKey.SSL_VERSION to "DEFAULT",
     OscPrefKey.HOME_COUNTRY to "XX",
-    OscPrefKey.HOME_CONNECTED_IP to EMPTY_TEXT
+    OscPrefKey.HOME_CONNECTED_IP to EMPTY_TEXT,
+    OscPrefKey.ROUTE_APP_LIST_TYPE to LIST_TYPE_ALLOWED,
 )
 
 private val EMPTY_SET = setOf<String>()
 
-internal val AUTH_PROTOCOl_PAP = "PAP"
-internal val AUTH_PROTOCOL_MSCHAPv2 = "MSCHAPv2"
-internal val AUTH_PROTOCOL_EAP_MSCHAPv2 = "EAP-MSCHAPv2"
+internal const val AUTH_PROTOCOl_PAP = "PAP"
+internal const val AUTH_PROTOCOL_MSCHAPv2 = "MSCHAPv2"
+internal const val AUTH_PROTOCOL_EAP_MSCHAPv2 = "EAP-MSCHAPv2"
 
 internal val DEFAULT_SET_MAP = mapOf(
     OscPrefKey.SSL_SUITES to EMPTY_SET,
     OscPrefKey.PPP_AUTH_PROTOCOLS to setOf(AUTH_PROTOCOl_PAP, AUTH_PROTOCOL_MSCHAPv2),
     OscPrefKey.ROUTE_ALLOWED_APPS to EMPTY_SET,
     OscPrefKey.ROUTE_EXCLUDED_APPS to EMPTY_SET,
+    OscPrefKey.ROUTE_SELECTED_APPS to EMPTY_SET,
 )
 
 internal val DEFAULT_URI_MAP = mapOf<OscPrefKey, Uri?>(

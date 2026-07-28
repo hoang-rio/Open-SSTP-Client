@@ -12,10 +12,10 @@ import kittoku.osc.preference.accessor.setIntPrefValue
 import kittoku.osc.preference.accessor.setSetPrefValue
 import kittoku.osc.preference.accessor.setStringPrefValue
 import kittoku.osc.preference.accessor.setURIPrefValue
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
 
-
-private const val RECORD_SEPARATOR = 0x1E.toChar().toString()
-private const val UNIT_SEPARATOR = 0x1F.toChar().toString()
 
 private val EXCLUDED_BOOLEAN_PREFERENCES = arrayOf(
     OscPrefKey.ROOT_STATE,
@@ -27,95 +27,84 @@ private val EXCLUDED_STRING_PREFERENCES = arrayOf(
     OscPrefKey.HOME_STATUS,
 )
 
+@Serializable
+internal class Profile() {
+    internal val booleanSetting = mutableMapOf<String, Boolean>()
+    internal val intSetting = mutableMapOf<String, Int>()
+    internal val stringSetting = mutableMapOf<String, String>()
+    internal val setSetting = mutableMapOf<String, Set<String>>()
+    internal val uriSetting = mutableMapOf<String, String>()
+}
 
-internal fun exportProfile(prefs: SharedPreferences): String {
-    var profile = ""
+internal fun serializeProfile(prefs: SharedPreferences): String {
+    val profile = Profile()
 
     DEFAULT_BOOLEAN_MAP.keys.filter { it !in EXCLUDED_BOOLEAN_PREFERENCES }.forEach {
-        profile += it.name + UNIT_SEPARATOR + getBooleanPrefValue(it, prefs).toString() + RECORD_SEPARATOR
+        profile.booleanSetting[it.name] = getBooleanPrefValue(it, prefs)
     }
 
+
     DEFAULT_INT_MAP.keys.forEach {
-        profile += it.name + UNIT_SEPARATOR + getIntPrefValue(it, prefs).toString() + RECORD_SEPARATOR
+        profile.intSetting[it.name] = getIntPrefValue(it, prefs)
     }
 
     DEFAULT_STRING_MAP.keys.filter { it !in EXCLUDED_STRING_PREFERENCES }.forEach {
-        profile += it.name + UNIT_SEPARATOR + getStringPrefValue(it, prefs) + RECORD_SEPARATOR
+        profile.stringSetting[it.name] = getStringPrefValue(it, prefs)
     }
 
     DEFAULT_SET_MAP.keys.forEach {
-        profile += it.name + UNIT_SEPARATOR + getSetPrefValue(it, prefs).joinToString(UNIT_SEPARATOR) + RECORD_SEPARATOR
+        profile.setSetting[it.name] = getSetPrefValue(it, prefs)
     }
 
     DEFAULT_URI_MAP.keys.forEach {
         getURIPrefValue(it, prefs)?.also { uri ->
-            profile += it.name + UNIT_SEPARATOR + uri.toString() + RECORD_SEPARATOR
+            profile.uriSetting[it.name] = uri.toString()
         }
     }
 
-    return profile
+    return Json.encodeToString(profile)
 }
 
-internal fun importProfile(profile: String?, prefs: SharedPreferences) {
-    val profileMap = profile?.split(RECORD_SEPARATOR)?.filter { it.isNotEmpty() }?.associate {
-        val index = it.indexOf(UNIT_SEPARATOR)
-        val key = it.substring(0, index)
-        val value = it.substring(index + 1)
+internal fun deserializeProfile(serialized: String): Profile? {
+    return try {
+        Json.decodeFromString<Profile>(serialized)
+    } catch (_: SerializationException) {
+        null
+    }
+}
 
-        key to value
-    } ?: mapOf()
-
+internal fun importProfile(profile: Profile?, prefs: SharedPreferences) {
     DEFAULT_BOOLEAN_MAP.keys.filter { it !in EXCLUDED_BOOLEAN_PREFERENCES }.forEach {
-        val value = profileMap[it.name]?.toBooleanStrict() ?: DEFAULT_BOOLEAN_MAP.getValue(it)
+        val value = profile?.booleanSetting[it.name] ?: DEFAULT_BOOLEAN_MAP.getValue(it)
         setBooleanPrefValue(value, it, prefs)
     }
 
     DEFAULT_INT_MAP.keys.forEach {
-        val value = profileMap[it.name]?.toInt() ?: DEFAULT_INT_MAP.getValue(it)
+        val value = profile?.intSetting[it.name] ?: DEFAULT_INT_MAP.getValue(it)
         setIntPrefValue(value, it, prefs)
     }
 
     DEFAULT_STRING_MAP.keys.filter { it !in EXCLUDED_STRING_PREFERENCES }.forEach {
-        val value = profileMap[it.name] ?: DEFAULT_STRING_MAP.getValue(it)
+        val value = profile?.stringSetting[it.name] ?: DEFAULT_STRING_MAP.getValue(it)
         setStringPrefValue(value, it, prefs)
     }
 
-    DEFAULT_SET_MAP.keys.forEach { key ->
-        val value = profileMap[key.name]?.split(UNIT_SEPARATOR)?.filter { it.isNotEmpty() }?.toSet() ?: DEFAULT_SET_MAP.getValue(key)
+    DEFAULT_SET_MAP.keys.forEach {
+        val value = profile?.setSetting[it.name] ?: DEFAULT_SET_MAP.getValue(it)
 
-        setSetPrefValue(value, key, prefs)
+        setSetPrefValue(value, it, prefs)
     }
 
     DEFAULT_URI_MAP.keys.forEach {
-        val value = profileMap[it.name]?.toUri() ?: DEFAULT_URI_MAP.getValue(it)
+        val value = profile?.uriSetting[it.name]?.toUri() ?: DEFAULT_URI_MAP.getValue(it)
         setURIPrefValue(value, it, prefs)
     }
 }
 
-internal fun summarizeProfile(profile: String): String {
-    var hostname: String = DEFAULT_STRING_MAP.getValue(OscPrefKey.HOME_HOSTNAME)
-    var username: String = DEFAULT_STRING_MAP.getValue(OscPrefKey.HOME_USERNAME)
-    var portNumber: String = DEFAULT_INT_MAP.getValue(OscPrefKey.SSL_PORT).toString()
-
-    profile.split(RECORD_SEPARATOR).filter { it.isNotEmpty() }.forEach {
-        val index = it.indexOf(UNIT_SEPARATOR)
-        val key = it.substring(0, index)
-        val value = it.substring(index + 1)
-
-        when (key) {
-            OscPrefKey.HOME_HOSTNAME.name -> {
-                hostname = value
-            }
-
-            OscPrefKey.HOME_USERNAME.name -> {
-                username = value
-            }
-
-            OscPrefKey.SSL_PORT.name -> {
-                portNumber = value
-            }
-        }
-    }
+internal fun summarizeProfile(profile: Profile): String {
+    val hostname = profile.stringSetting[OscPrefKey.HOME_HOSTNAME.name]
+    val username = profile.stringSetting[OscPrefKey.HOME_USERNAME.name]
+    val portNumber = profile.intSetting[OscPrefKey.SSL_PORT.name].toString()
 
     return "[Hostname]\n$hostname\n\n[Username]\n$username\n\n[Port Number]\n$portNumber"
 }
