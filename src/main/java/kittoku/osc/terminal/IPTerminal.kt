@@ -57,7 +57,7 @@ internal class IPTerminal(private val bridge: SharedBridge) {
             }
 
             // Fallback: if no DNS was configured at all, use public DNS to avoid DNS leaks
-            if (!isCustomDNSServerUsed && bridge.currentProposedDNS.contentEquals(ByteArray(4))) {
+            if (!doUseCustomDNSServer && bridge.currentProposedDNS.contentEquals(ByteArray(4))) {
                 bridge.builder.addDnsServer("8.8.8.8")
                 bridge.builder.addDnsServer("8.8.4.4")
             }
