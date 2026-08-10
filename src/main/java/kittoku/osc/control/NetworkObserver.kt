@@ -11,6 +11,8 @@ import kittoku.osc.preference.OscPrefKey
 import kittoku.osc.preference.accessor.getBooleanPrefValue
 import kittoku.osc.preference.accessor.getStringPrefValue
 import kittoku.osc.preference.accessor.setStringPrefValue
+import java.net.Inet4Address
+import java.net.InetAddress
 
 
 internal class NetworkObserver(val bridge: SharedBridge) {
@@ -58,11 +60,24 @@ internal class NetworkObserver(val bridge: SharedBridge) {
 
         summary.add("[Assigned IP Address]")
         properties.linkAddresses.forEach {
-            val connectedIp = it.address.hostAddress ?: ""
-            summary.add(connectedIp)
-            if (connectedIp != "") {
-                setStringPrefValue(connectedIp, OscPrefKey.HOME_CONNECTED_IP, bridge.prefs)
-            }
+            summary.add(it.address.hostAddress ?: "")
+        }
+        // HOME_CONNECTED_IP drives the "connected" UI/notification text. It must
+        // be the server-assigned IPv4 address: the locally-generated IPv6
+        // (link-local FE80::/10 and per-install ULA fd00::/8) is never an
+        // assigned IP and must not be reported as such. Fall back to a global
+        // IPv6 address only when no IPv4 was negotiated.
+        val assignedIp = properties.linkAddresses
+            .map { it.address }
+            .firstOrNull { it is Inet4Address }
+            ?.hostAddress
+            ?: properties.linkAddresses
+                .map { it.address }
+                .firstOrNull { it !is Inet4Address && isGlobalIpv6(it) }
+                ?.hostAddress
+            ?: ""
+        if (assignedIp != "") {
+            setStringPrefValue(assignedIp, OscPrefKey.HOME_CONNECTED_IP, bridge.prefs)
         }
         summary.add("")
 
@@ -93,6 +108,13 @@ internal class NetworkObserver(val bridge: SharedBridge) {
         }.also {
             setStringPrefValue(it, OscPrefKey.HOME_STATUS, bridge.prefs)
         }
+    }
+
+    private fun isGlobalIpv6(address: InetAddress): Boolean {
+        return !address.isAnyLocalAddress &&
+            !address.isLinkLocalAddress &&
+            !address.isSiteLocalAddress &&
+            !address.isLoopbackAddress
     }
 
     private fun wipeStatus() {
