@@ -65,17 +65,26 @@ internal class IPTerminal(private val bridge: SharedBridge) {
             setIPv4BasedRouting()
         }
 
-        if (bridge.PPP_IPv6_ENABLED) {
-            if (bridge.currentIPv6.contentEquals(ByteArray(8))) {
-                bridge.controlMailbox.send(ControlMessage(Where.IPv6, Result.ERR_INVALID_ADDRESS))
-                return
-            }
-
+        // IPv6 is optional: if the server never negotiated an IPv6CP
+        // interface identifier, keep the connection IPv4-only instead of aborting.
+        if (bridge.PPP_IPv6_ENABLED && !bridge.currentIPv6.contentEquals(ByteArray(8))) {
             ByteArray(16).also { // for link local addresses
                 "FE80".toHexByteArray().copyInto(it)
                 ByteArray(6).copyInto(it, destinationOffset = 2)
                 bridge.currentIPv6.copyInto(it, destinationOffset = 8)
                 bridge.builder.addAddress(InetAddress.getByAddress(it), 64)
+            }
+
+            // Source the tunnel from the per-install ULA so the server's NAT66
+            // (fd00::/8) can route IPv6; a link-local address alone can never
+            // reach off-link hosts. A bad ULA must not take down the tunnel.
+            if (bridge.homeUlaV6.isNotEmpty()) {
+                try {
+                    InetAddress.getByName(bridge.homeUlaV6).also {
+                        bridge.builder.addAddress(it, 64)
+                    }
+                } catch (_: Exception) {
+                }
             }
 
             setIPv6BasedRouting()

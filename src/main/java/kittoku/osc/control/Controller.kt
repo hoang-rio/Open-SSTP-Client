@@ -183,11 +183,16 @@ internal class Controller(internal val bridge: SharedBridge) {
                     incomingManager!!.registerMailbox(it)
                     it.launchJobNegotiation()
 
-                    if (!expectProceeded(Where.IPV6CP, PPP_NEGOTIATION_TIMEOUT)) {
-                        return@launch
+                    when (awaitIpv6cpNegotiation()) {
+                        Ipv6cpOutcome.PROCEEDED -> incomingManager!!.unregisterMailbox(it)
+                        Ipv6cpOutcome.SKIPPED -> {
+                            // Server does not support IPv6CP; keep the connection IPv4-only.
+                            it.cancel()
+                            incomingManager!!.unregisterMailbox(it)
+                            bridge.service.logWriter?.report("IPv6CP not supported by server; continuing with IPv4-only")
+                        }
+                        Ipv6cpOutcome.ABORTED -> return@launch
                     }
-
-                    incomingManager!!.unregisterMailbox(it)
                 }
             }
 
@@ -216,20 +221,78 @@ internal class Controller(internal val bridge: SharedBridge) {
     }
 
     private suspend fun expectProceeded(where: Where, timeout: Long?): Boolean {
-        val received = if (timeout != null) {
-            withTimeoutOrNull(timeout) {
+        while (true) {
+            val received = if (timeout != null) {
+                withTimeoutOrNull(timeout) {
+                    bridge.controlMailbox.receive()
+                } ?: ControlMessage(where, Result.ERR_TIMEOUT)
+            } else {
                 bridge.controlMailbox.receive()
-            } ?: ControlMessage(where, Result.ERR_TIMEOUT)
-        } else {
+            }
+
+            if (isStaleIpv6cpLeftover(received)) {
+                // Leftover from the IPv6CP phase we skipped; the server has no
+                // usable IPv6. Drop it and wait for the actual phase result.
+                bridge.service.logWriter?.report("Ignoring stale ${received.from.name}: ${received.result.name} from skipped IPv6CP")
+                continue
+            }
+
+            if (received.result == Result.PROCEEDED) {
+                assertAlways(received.from == where)
+
+                return true
+            }
+
+            failConnection(received)
+
+            return false
+        }
+    }
+
+    private fun isStaleIpv6cpLeftover(received: ControlMessage): Boolean {
+        return received.from == Where.IPV6CP ||
+            received.from == Where.IPV6CP_IDENTIFIER ||
+            (received.from == Where.PPP && received.result == Result.ERR_PROTOCOL_REJECTED)
+    }
+
+    private enum class Ipv6cpOutcome {
+        PROCEEDED,
+        SKIPPED, // IPv6 not negotiated; degrade to IPv4-only
+        ABORTED, // unrelated fatal error, connection is being torn down
+    }
+
+    private suspend fun awaitIpv6cpNegotiation(): Ipv6cpOutcome {
+        val received = withTimeoutOrNull(PPP_NEGOTIATION_TIMEOUT) {
             bridge.controlMailbox.receive()
         }
 
-        if (received.result == Result.PROCEEDED) {
-            assertAlways(received.from == where)
-
-            return true
+        if (received == null) {
+            // Server never answered IPv6CP; treat as unsupported.
+            return Ipv6cpOutcome.SKIPPED
         }
 
+        if (received.result == Result.PROCEEDED) {
+            assertAlways(received.from == Where.IPV6CP)
+
+            return Ipv6cpOutcome.PROCEEDED
+        }
+
+        val isIpv6cpFailure =
+            (received.from == Where.IPV6CP && received.result == Result.ERR_COUNT_EXHAUSTED) ||
+                (received.from == Where.IPV6CP_IDENTIFIER && received.result == Result.ERR_OPTION_REJECTED) ||
+                (received.from == Where.PPP && received.result == Result.ERR_PROTOCOL_REJECTED)
+
+        if (isIpv6cpFailure) {
+            return Ipv6cpOutcome.SKIPPED
+        }
+
+        // Unrelated fatal error; abort exactly like expectProceeded would.
+        failConnection(received)
+
+        return Ipv6cpOutcome.ABORTED
+    }
+
+    private fun failConnection(received: ControlMessage) {
         val lastPacketType = if (received.result == Result.ERR_DISCONNECT_REQUESTED) {
             SSTP_MESSAGE_TYPE_CALL_DISCONNECT_ACK
         } else {
@@ -248,8 +311,6 @@ internal class Controller(internal val bridge: SharedBridge) {
             bridge.service.logWriter?.report(log)
             bridge.service.notifyError(header)
         }
-
-        return false
     }
 
     internal fun disconnect(): Job? { // use if the user want to normally disconnect

@@ -10,6 +10,7 @@ import kittoku.osc.preference.accessor.getStringPrefValue
 import kittoku.osc.preference.getValidSelectedAppInfos
 import kittoku.osc.service.SstpVpnService
 import kittoku.osc.terminal.IPTerminal
+import java.security.SecureRandom
 import kittoku.osc.terminal.SSLTerminal
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.channels.Channel
@@ -101,6 +102,7 @@ internal class SharedBridge(internal val service: SstpVpnService) {
     internal val PPP_AUTH_PROTOCOLS = getSetPrefValue(OscPrefKey.PPP_AUTH_PROTOCOLS, prefs)
     internal val PPP_IPv4_ENABLED = getBooleanPrefValue(OscPrefKey.PPP_IPv4_ENABLED, prefs)
     internal val PPP_IPv6_ENABLED = getBooleanPrefValue(OscPrefKey.PPP_IPv6_ENABLED, prefs)
+    internal val homeUlaV6 = getStringPrefValue(OscPrefKey.HOME_ULA_V6, prefs)
 
     internal var hlak: ByteArray? = null
     internal val nonce = ByteArray(32)
@@ -113,7 +115,12 @@ internal class SharedBridge(internal val service: SstpVpnService) {
     internal var currentMRU = PPP_MRU
     internal var currentAuth = ""
     internal val currentIPv4 = ByteArray(4)
-    internal val currentIPv6 = ByteArray(8)
+    // RFC 5072 requires a non-zero interface-identifier; some servers reject
+    // (rather than NAK) an all-zero IID, so seed it before IPv6CP negotiation.
+    internal val currentIPv6 = ByteArray(8).also { bytes ->
+        SecureRandom().nextBytes(bytes)
+        bytes[0] = (bytes[0].toInt() or 0x01).toByte()
+    }
     internal val currentProposedDNS = ByteArray(4)
 
     internal val selectedApps: List<AppString> = mutableListOf<AppString>().also {
