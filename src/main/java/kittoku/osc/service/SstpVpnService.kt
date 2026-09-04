@@ -236,6 +236,15 @@ class SstpVpnService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Always promote to the foreground first. This service is started via
+        // startForegroundService(), and the CONNECT branch returns START_STICKY.
+        // If the system kills and restarts it, onStartCommand is re-delivered
+        // with a null intent, which would fall through to the else branch below
+        // WITHOUT calling startForeground(), throwing
+        // ForegroundServiceDidNotStartInTimeException. Calling beForegrounded()
+        // up front guarantees startForeground() is invoked within the timeout on
+        // every delivery (connect, disconnect, or null-intent restart).
+        beForegrounded()
         return when (intent?.action) {
             ACTION_VPN_CONNECT -> {
                 controller?.kill(false, null)
@@ -243,7 +252,6 @@ class SstpVpnService : VpnService() {
                 currentConnectedIp = ""
                 resetTrafficTracking()
 
-                beForegrounded()
                 cancelNotification(NOTIFICATION_ERROR_ID)
                 resetReconnectionLife(prefs)
                 if (getBooleanPrefValue(OscPrefKey.LOG_DO_SAVE_LOG, prefs)) {
