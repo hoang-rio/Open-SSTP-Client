@@ -6,6 +6,8 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
 import kittoku.osc.SharedBridge
 import kittoku.osc.preference.OscPrefKey
 import kittoku.osc.preference.accessor.getBooleanPrefValue
@@ -18,6 +20,7 @@ import java.net.InetAddress
 internal class NetworkObserver(val bridge: SharedBridge) {
     private val manager = bridge.service.getSystemService(ConnectivityManager::class.java)
     private val callback: ConnectivityManager.NetworkCallback
+    private val callbackThread = HandlerThread("network-callback").apply { start() }
 
     init {
         wipeStatus()
@@ -43,7 +46,7 @@ internal class NetworkObserver(val bridge: SharedBridge) {
             }
         }
 
-        manager.registerNetworkCallback(request, callback)
+        manager.registerNetworkCallback(request, callback, Handler(callbackThread.looper))
     }
 
     private fun updateSummary(properties: LinkProperties) {
@@ -126,6 +129,9 @@ internal class NetworkObserver(val bridge: SharedBridge) {
             manager.unregisterNetworkCallback(callback)
         } catch (_: IllegalArgumentException) {} // already unregistered
 
+        if (callbackThread.isAlive) {
+            callbackThread.quitSafely()
+        }
         wipeStatus()
     }
 }
