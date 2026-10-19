@@ -21,6 +21,7 @@ internal class NetworkObserver(val bridge: SharedBridge) {
     private val manager = bridge.service.getSystemService(ConnectivityManager::class.java)
     private val callback: ConnectivityManager.NetworkCallback
     private val callbackThread = HandlerThread("network-callback").apply { start() }
+    private val callbackHandler = Handler(callbackThread.looper)
 
     init {
         wipeStatus()
@@ -35,18 +36,30 @@ internal class NetworkObserver(val bridge: SharedBridge) {
         callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                    manager.getLinkProperties(network)?.also {
-                        updateSummary(it)
+                    callbackHandler.post {
+                        manager.getLinkProperties(network)?.also {
+                            updateSummary(it)
+                        }
                     }
                 }
             }
 
             override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
-                updateSummary(linkProperties)
+                // Keep the (string-building) summary work off the main looper: on API 26+
+                // the callback is already delivered on callbackThread, on API 24-25 it is
+                // delivered on main, so hop onto our worker thread there.
+                callbackHandler.post { updateSummary(linkProperties) }
             }
         }
 
-        manager.registerNetworkCallback(request, callback, Handler(callbackThread.looper))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.registerNetworkCallback(request, callback, Handler(callbackThread.looper))
+        } else {
+            // The Handler overload of registerNetworkCallback() was only added in API 26;
+            // calling it on API 24-25 throws NoSuchMethodError. Register without a Handler
+            // and dispatch the heavy work to the worker thread inside the callbacks above.
+            manager.registerNetworkCallback(request, callback)
+        }
     }
 
     private fun updateSummary(properties: LinkProperties) {
