@@ -395,7 +395,7 @@ class SstpVpnService : VpnService() {
             it.setAutoCancel(true)
             val serverName = getStringPrefValue(OscPrefKey.HOME_SERVER_NAME, prefs)
                 .ifEmpty { getStringPrefValue(OscPrefKey.HOME_HOSTNAME, prefs) }
-            it.setContentTitle(getString(R.string.notification_title, serverName))
+            it.setContentTitle(getString(R.string.sstp_notification_title, serverName))
             if (connectedIp != "") {
                 val contentText = if (mDisplaySpeed && currentTrafficSnapshot != SstpTrafficSnapshot.EMPTY) {
                     formatTrafficSnapshot(currentTrafficSnapshot)
@@ -462,7 +462,7 @@ class SstpVpnService : VpnService() {
             it.setAutoCancel(true)
             val serverName = getStringPrefValue(OscPrefKey.HOME_SERVER_NAME, prefs)
                 .ifEmpty { getStringPrefValue(OscPrefKey.HOME_HOSTNAME, prefs) }
-            it.setContentTitle(getString(R.string.notification_title, serverName))
+            it.setContentTitle(getString(R.string.sstp_notification_title, serverName))
             it.setContentText(
                 if (mDisplaySpeed && currentTrafficSnapshot != SstpTrafficSnapshot.EMPTY) {
                     formatTrafficSnapshot(currentTrafficSnapshot)
